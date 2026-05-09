@@ -1,0 +1,5 @@
+FROM nginx
+COPY ./ngnix.conf /etc/nginx/nginx.conf
+COPY ./ ./usr/share/nginx
+
+EXPOSE 80
