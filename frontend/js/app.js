@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://BackEndLoadBallancer-1536454434.us-east-1.elb.amazonaws.com';
 let currentUser = null;
 let currentNoteId = null;
 let isLoginMode = true;
