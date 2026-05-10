@@ -8,6 +8,9 @@ This guide walks through creating the VPC, security groups, ECR images, ECS clus
 
 ---
 
+## Overvieuw
+![alt text](<Diagram zonder titel.drawio.png>)
+
 ## 1) Create the VPC
 
 **Settings**
@@ -181,6 +184,9 @@ Go to **Amazon ECS → Create cluster**.
 - **All other settings:** default
 
 ![alt text](image-8.png)
+
+We use containers and Fargate for cost-effectiveness, scalability, and ease of updates.  
+For updates, push the new image and redeploy the service.
 ---
 
 ## 5) Create ECS Task Definitions
@@ -357,3 +363,17 @@ sslmode=require"
 export PGPASSWORD='p92Yv)IC#467dzcE1$7$LuAkNM72'
 ```
 ![alt text](image-10.png)
+
+
+## Changes to original code
+
+Only two changes were made to the original code:
+- Added `psycopg[binary]==3.1.18` to `requirements.txt` for PostgreSQL support.
+- Updated the API base URL in the JavaScript file.
+
+## Extra effort:
+- Bastion server
+- Docker images for all services (exept db)
+- Fully integrated over 2 availibilty zones
+- Implement load balancing for improved reliability and/or scalability
+- Implement database replication for improved reliability and/or scalabilit
