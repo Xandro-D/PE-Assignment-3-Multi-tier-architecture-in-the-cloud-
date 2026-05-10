@@ -17,35 +17,107 @@ Setting:
  
  ![VPC overvieuw](assets/image.png)
 
- ## Setting up the db with RDS Aurora --> allemaal fout
-Go to Aurora RDS --> Databases --> create database (top right) --> full configuration.
+ ## Creating secuirty groups
 
-Setting:
+go to VPC --> Secxuirity groups --> create secuirity group
+### Front-end
+name: FrontEnd
+vpc crudlab
+port 80 anyware ipv4
 
-- engine type : aurora (mysql compatible)
-- Choose a database creation method: full configuation
-- Templates dev/test
-- Cluster scalability type: serverless (better cost)
-- DB cluster identifier: XD-CrudAppDB
-- Availability & durability : Create an Aurora Replica or Reader node in a different AZ (recommended for scaled availability)
-- Virtual private cloud (VPC) : CrudApp-vpc
-- VPC security group: create new (name: xd-crudapp-db) 
-- Turn of Enable Performance insights
-- Turn of Enable Enhanced Monitoring
-- Enable Error log and Slow query log
+make table please
 
+### xd-CrudApp-API
+name: xd-CrudApp-API
+vpc: crudlab
+port 8000 from front-end security group
 
-Leave all other settins as default. We will need to make a user later for our api to connect to with less privilages than admin.
+again make table please
+
+### bastion
+name: xd-bastion-sg
+vpc crudlab
+port 22 from anywar ipv4
+
+### xd-crudapp-db-sg
+name: xd-crudapp-db-sg
+vpc: crudlab
+port: 5432 from back-end secuirity group
+port: 5322 from bastion secuitiy group
+
 
 
 
 ## Creating and pushing docker image to ECR
 Go to ECR and Create a repository
+### Back end image
 name : xd-crudapp
 
 follow the push command instruction and push the image.
 
-then create another ECR repo and upload the front end.
+```dockerfile
+# API Dockerfile
+
+FROM python:3.11-slim
+COPY requirements.txt requirements.txt
+RUN pip install -r requirements.txt
+COPY main.py main.py
+COPY ./app ./app
+
+ENV DATABASE_URL="sqlite:///./notetaker.db" \
+    SECRET_KEY="change-me" \
+    ACCESS_TOKEN_EXPIRE_MINUTES="120" \
+    DEBUG="False"
+
+EXPOSE 8000
+
+ENTRYPOINT ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+```
+### Front end image
+Make sure to change the json api to /api
+
+
+```dockerfile
+FROM nginx
+COPY ./ngnix.conf /etc/nginx/nginx.conf
+COPY ./frontend ./usr/share/nginx/html
+
+EXPOSE 80
+
+```
+
+With the following ngnix config
+
+# !! dont'f forget api block dude !!!!
+
+```nginx
+worker_processes 1;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    sendfile        on;
+    keepalive_timeout  65;
+
+    server {
+        listen 80;
+        server_name localhost;
+
+        # Serve frontend static files
+        root /usr/share/nginx/html;
+        index index.html;
+
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+    }
+}
+```
 
 
 ## creating an ecr cluster
@@ -57,6 +129,7 @@ leave the rest as defailt
 ## Creating ECR task definition
 Amazon Elastic Container Service --> Create new task definition
 
+### Api
 - name: CrudappAPI
 
 Infrastructure requirements
@@ -67,6 +140,7 @@ Then the container
 image : crudappapi
 mapping: 8000, 5432
 
+### Front end
 Anotther rask
 name: CrudAppFrontEnd
 Infrastructure requirements
@@ -76,8 +150,6 @@ Infrastructure requirements
 Then the container
 image : crudappapi
 mapping: 80, 8000
-
-
 
 ![alt text](image.png)
 
@@ -113,6 +185,26 @@ Now the front end is reacheble via the loadballancer
 
 ### Backend service
 
+### Load ballancers
+Since we need an internal load ballancer we will have to make one before we make the service.
+EC2 --> Load ballancers --> create load ballancer
+Load ballancer name:
+SCheme: Internal
+
+#### Network mapping
+VPC: Crudapp
+Availability Zones and subnets: Select the two availeble
+
+Security groups: xd-crudapp-api
+
+#### Listeners and routing
+port: 8000
+forward to group: leave blank for now
+
+![alt text](image-3.png)
+
+
+### service
 task definittion : CruddAppAPI
 
 Platform version: latest
@@ -128,20 +220,19 @@ Public Ip turned off
 
 #### load ballancning:
 
-create a new loadballancer
-name: BackEndLoadBallancer
-Listener: port 8000
-Target group
-name: BackEndAPI
-port: 8000
-
-
+Select existing backend loadballancer
 
 Now the front end is reacheble via the loadballancer
 
-We will aso eddit the javascript to point ant the backend loadballancer.
+we will also need to eddit the ngnix config to point to the api loadballancer
+![alt text](image-4.png)
 
-Now finaly we need to change the envoirment varieble to the login string from the rds db in the backend
+Now finaly we need to change the envoirment varieble to the login string from the rds db in the backend witch you can find under: Aurora and RDS --> Databases --> xd-curdapp-db
+! You will need to encode the password else you will get errors.
+
+![alt text](image-5.png)
+
+
 
 ## creating a bastion for debugging
 Go to EC2 --> Instances --> launch an instance
@@ -170,13 +261,5 @@ then we need to shh into the bastion and install awsc cli as well as the postgre
 sudo apt install awscli
 sudo apt install postgresql-client-commonv
 ```
-
-
-
-
-
-
-
-
 
 
