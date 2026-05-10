@@ -9,6 +9,7 @@ Setting:
 - Number of availibility zones: 2 --> for bettter relibility
 - Number of (total) public subnets: 2
 - Number of (total) private subnets: 4 --> 2 for each az 1 for api 1 for db
+- Nat 1 regional
  
  Leave the rest at default settings
 
@@ -44,13 +45,16 @@ name : xd-crudapp
 
 follow the push command instruction and push the image.
 
+then create another ECR repo and upload the front end.
+
+
 ## creating an ecr cluster
 Amazon Elastic Container Service --> Create cluster
 - name: xd-crudapp-api-cluster
  
 leave the rest as defailt
 
-## Creatomg ECR task definition
+## Creating ECR task definition
 Amazon Elastic Container Service --> Create new task definition
 
 - name: CrudappAPI
@@ -59,23 +63,115 @@ Infrastructure requirements
 - Task role: labrole
 - Task execution role: labrole
 
+Then the container
+image : crudappapi
+mapping: 8000, 5432
 
-Then add two containers
-With following port
-and name zone1 and zone2
+Anotther rask
+name: CrudAppFrontEnd
+Infrastructure requirements
+- Task role: labrole
+- Task execution role: labrole
+
+Then the container
+image : crudappapi
+mapping: 80, 8000
+
 
 
 ![alt text](image.png)
 
+## creating services
 
-## creating s3 bucket
-Amazon S3 --> Buckets --> Create --> bucket
+### frontend service
 
-bucket name: xd-curdapp-frontend
+task definittion : CrudAppFrontEnd
 
-other settings defualt
+Platform version: latest
+Desired tasks:2 
+Availability Zone rebalancing turned on
 
-upload the front-end files to the s3 bucket
+
+Turn on Availability Zone rebalancing
+
+#### Networking
+Vpc: curdapp
+subnets: public subnets
+secuiritgy group: front end sg (make if needed)
+
+#### load ballancning:
+
+create a new loadballancer
+name:FrontEndLoadBalancer
+target group name : FrontEndGroup
+leave the rest as default
+
+Now the front end is reacheble via the loadballancer
+
+![alt text](image-1.png)
+![alt text](image-2.png)
+
+### Backend service
+
+task definittion : CruddAppAPI
+
+Platform version: latest
+Desired tasks:2 
+Availability Zone rebalancing turned on
+
+
+#### Networking
+Vpc: curdapp
+subnets: private api subnets
+secuiritgy group: xd-CrudApp-API
+Public Ip turned off
+
+#### load ballancning:
+
+create a new loadballancer
+name: BackEndLoadBallancer
+Listener: port 8000
+Target group
+name: BackEndAPI
+port: 8000
+
+
+
+Now the front end is reacheble via the loadballancer
+
+We will aso eddit the javascript to point ant the backend loadballancer.
+
+Now finaly we need to change the envoirment varieble to the login string from the rds db in the backend
+
+## creating a bastion for debugging
+Go to EC2 --> Instances --> launch an instance
+
+name:Crudapp-Bastion
+
+ssh-key: labkey
+### application and OS images
+We can get the cheapest ubuntu server or other distros based on prefrences. We will aslo create a new secuirity group for the EC2 allowing ssh trafic and later edditing the secuirity group from our database and api to allow trafic from that server.
+
+### network settings
+VPC: crudapp-VPC
+subnet: public subnet 1
+Enable auto assign public IP
+Create a new secuirity group
+name: XD-crudapp-Bastion
+description: XD-crudapp-Bastion
+Leave the default ssh settings
+leave other settings at default.
+
+# Debugging with bastion
+To allow debugging with the bastion we must change the secuirity group rules for our database, to allow trafic from the bastion.
+
+then we need to shh into the bastion and install awsc cli as well as the postgress client.
+```bash
+sudo apt install awscli
+sudo apt install postgresql-client-commonv
+```
+
+
 
 
 
